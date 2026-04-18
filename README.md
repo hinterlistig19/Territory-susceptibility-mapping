@@ -64,6 +64,12 @@ The susceptibility raster was exported as GeoTIFF (30m, EPSG:4326)
 and validated in QGIS against satellite imagery and known 
 geomorphological features of the area.
 
+## Next Steps
+- Integration of lithological data (Macrostrat) — 
+  API integration in progress
+- shales and siliciclastics identified as high-risk 
+  lithologies along the main road corridor
+
 ## Results
 
 | Class | Score | Description | Area (pixels) |
