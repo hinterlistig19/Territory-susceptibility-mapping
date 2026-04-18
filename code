@@ -24,7 +24,7 @@ var landcover = ee.Image("ESA/WorldCover/v200/2021").clip(ritsa);
 
 // 5. Susceptibility factors
 var slopeRisk = slope.gt(25);
-var rainRisk = chirps.gt(5.5);
+var rainRisk = chirps.gt(4.0);
 var noForest = landcover.neq(10);
 
 // 6. Combined susceptibility index (0-3)
