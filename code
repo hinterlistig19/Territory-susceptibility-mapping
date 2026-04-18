@@ -1,0 +1,103 @@
+// =============================================
+// Landslide Susceptibility - Ritsa National Park, Abkhazia
+// Based on: BSc thesis,Geomorphology, MSU 2018
+/
+// =============================================
+
+// 1. Study area - expanded to include road start
+var ritsa = ee.Geometry.Rectangle([40.2, 43.1, 41.2, 43.8]);
+Map.centerObject(ritsa, 10);
+
+// 2. SRTM - terrain factors
+var dem = ee.Image("USGS/SRTMGL1_003").clip(ritsa);
+var slope = ee.Terrain.slope(dem);
+var aspect = ee.Terrain.aspect(dem);
+
+// 3. Rainfall - CHIRPS annual mean
+var chirps = ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY")
+  .filterDate('2015-01-01', '2020-12-31')
+  .mean()
+  .clip(ritsa);
+
+// 4. Land cover - ESA WorldCover
+var landcover = ee.Image("ESA/WorldCover/v200/2021").clip(ritsa);
+
+// 5. Susceptibility factors
+var slopeRisk = slope.gt(25);
+var rainRisk = chirps.gt(5.5);
+var noForest = landcover.neq(10);
+
+// 6. Combined susceptibility index (0-3)
+var susceptibility = slopeRisk
+  .add(rainRisk)
+  .add(noForest)
+  .clip(ritsa);
+
+// 7. Visualize
+Map.addLayer(dem, {min:100, max:3300,
+  palette:['green','yellow','white']}, 'DEM');
+Map.addLayer(slope, {min:0, max:60,
+  palette:['green','yellow','red']}, 'Slope');
+Map.addLayer(chirps, {min:3, max:8,
+  palette:['white','blue','darkblue']}, 'Rainfall');
+Map.addLayer(susceptibility, {min:0, max:3,
+  palette:['green','yellow','orange','red']}, 'Susceptibility');
+
+// 8. Main road - digitized in GEE
+var mainRoad = geometry;
+
+Map.addLayer(
+  ee.FeatureCollection([ee.Feature(mainRoad)]),
+  {color: 'red'},
+  'Main Road to Lake Ritsa'
+);
+
+// 9. Buffer 500m - priority protection zone (Chapter 5 thesis)
+var roadBuffer = mainRoad.buffer(500);
+var roadRisk = susceptibility.clip(roadBuffer);
+Map.addLayer(roadRisk, {min:0, max:3,
+  palette:['green','yellow','orange','red']},
+  'Risk along road');
+  
+ // 10. Geology - USGS Global Lithology
+var litho = ee.Image("CSP/ERGo/1_0/Global/ALOS_CHILI")
+  .clip(ritsa);
+
+// Proxy for lithological instability:
+// Low CHILI = north-facing cold wet slopes = shales more unstable
+var lithoRisk = litho.lt(50);
+
+Map.addLayer(litho, {
+  min: 0, max: 255,
+  palette: ['red','orange','yellow','green']
+}, 'Slope Insolation (Lithology proxy)');
+
+// 11. Final susceptibility with geology (0-4)
+var susceptibilityFull = slopeRisk
+  .add(rainRisk)
+  .add(noForest)
+  .add(lithoRisk)
+  .clip(ritsa);
+
+Map.addLayer(susceptibilityFull, {min:0, max:4,
+  palette:['green','yellow','orange','red','darkred']},
+  'Susceptibility with Geology');
+// 10. Statistics
+var stats = susceptibility.reduceRegion({
+  reducer: ee.Reducer.frequencyHistogram(),
+  geometry: ritsa,
+  scale: 30,
+  maxPixels: 1e9
+});
+print('Susceptibility distribution:', stats);
+// Export to Google Drive as GeoTIFF
+Export.image.toDrive({
+  image: susceptibilityFull,
+  description: 'Landslide_Susceptibility_Ritsa',
+  folder: 'GEE_exports',
+  fileNamePrefix: 'landslide_susceptibility_ritsa',
+  region: ritsa,
+  scale: 30,
+  crs: 'EPSG:4326',
+  maxPixels: 1e9
+});
